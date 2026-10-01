@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ScrollTax</string>
+    <string name="widget_description">Shows how many reels you have scrolled today.</string>
+    <string name="accessibility_description">ScrollTax counts the reels and shorts you scroll in Instagram, YouTube, Facebook, Snapchat and X. Everything stays on your phone.</string>
+</resources>

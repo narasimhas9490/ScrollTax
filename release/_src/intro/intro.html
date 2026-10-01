@@ -1,0 +1,299 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ScrollTax intro</title>
+<!--
+  The ScrollTax intro video as one deterministic timeline.
+  renderAt(seconds) draws any moment, so render.mjs can step it frame by frame.
+  Open this file in a browser to preview it in real time (no sound).
+-->
+<style>
+@font-face { font-family: Poppins; font-weight: 400; src: url(fonts/Poppins-Regular.ttf); }
+@font-face { font-family: Poppins; font-weight: 500; src: url(fonts/Poppins-Medium.ttf); }
+@font-face { font-family: Poppins; font-weight: 600; src: url(fonts/Poppins-SemiBold.ttf); }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #0F0F13; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #0F0F13;
+         font-family: Poppins, 'Segoe UI', sans-serif; color: #fff; }
+#glow { position: absolute; inset: 0; background: radial-gradient(900px 620px at 50% 46%, rgba(255,111,168,.10), rgba(255,111,168,0) 70%); }
+#stage > * { position: absolute; left: 0; top: 0; will-change: transform, opacity; }
+.c { white-space: nowrap; text-align: center; }
+.dot { width: 72px; height: 72px; border-radius: 50%; }
+.muted { color: #9A9AA5; }
+b { color: #FF6FA8; font-weight: inherit; }
+#pill { display: flex; align-items: center; justify-content: center; gap: 22px; border-radius: 80px; overflow: hidden;
+        font-size: 84px; font-weight: 600; }
+.app { text-align: center; white-space: nowrap; }
+.app .n { font-size: 46px; font-weight: 600; }
+.app .s { font-size: 30px; color: #9A9AA5; margin-top: 2px; }
+#phone { width: 420px; height: 880px; border-radius: 56px; border: 3px solid #2E2E38; overflow: hidden; background: #0F0F13;
+         box-shadow: 0 40px 160px rgba(255,111,168,.22); }
+#phone > div { position: absolute; left: 0; top: 0; width: 414px; height: 874px; overflow: hidden; background: #0F0F13; }
+#phone img.shot { position: absolute; left: 0; top: -52px; width: 414px; }
+.card { position: absolute; left: 0; top: 0; width: 414px; height: 874px; }
+.card i { position: absolute; background: rgba(255,255,255,.22); border-radius: 30px; }
+#fpill { position: absolute; left: 50%; top: 22px; display: flex; align-items: center; gap: 9px; padding: 8px 18px 8px 14px;
+         background: rgba(20,20,24,.86); border-radius: 40px; font-size: 26px; font-weight: 500; }
+.ftitle { font-size: 84px; font-weight: 600; line-height: 1.1; letter-spacing: -1.5px; white-space: nowrap; }
+.fdesc { font-size: 40px; line-height: 1.4; color: #9A9AA5; width: 860px; }
+.pdot { height: 14px; border-radius: 7px; }
+.chip { display: flex; align-items: center; gap: 20px; padding: 26px 44px 26px 36px; background: #1A1A20; border: 2px solid #2E2E38;
+        border-radius: 70px; font-size: 46px; font-weight: 500; white-space: nowrap; }
+.chip span { width: 22px; height: 22px; border-radius: 50%; background: #FF6FA8; }
+.widget { position: absolute; left: 30px; top: 250px; width: 354px; height: 150px; border-radius: 40px; background: #1E1A1E;
+          display: flex; align-items: center; gap: 18px; padding: 0 26px; box-shadow: 0 16px 50px rgba(0,0,0,.35); }
+.widget .wn { font-size: 50px; font-weight: 600; line-height: 1.05; }
+.widget .wl { font-size: 20px; color: #B0B0B8; }
+.widget .wt { margin-left: auto; font-size: 24px; color: #FF6FA8; }
+#wbig { width: 700px; height: 296px; border-radius: 80px; background: #1E1A1E; display: flex; align-items: center; gap: 36px;
+        padding: 0 52px; box-shadow: 0 40px 160px rgba(255,111,168,.30), 0 20px 60px rgba(0,0,0,.5); }
+#wbig .wn { font-size: 100px; font-weight: 600; line-height: 1.05; }
+#wbig .wl { font-size: 40px; color: #B0B0B8; }
+#wbig .wt { margin-left: auto; font-size: 48px; color: #FF6FA8; }
+#fade { width: 1920px; height: 1080px; background: #000; }
+</style>
+</head>
+<body>
+<div id="stage"><div id="glow"></div></div>
+<script>
+'use strict';
+const BEAT = 0.6;                                   // 100 bpm, same grid as make_music.py
+const S1 = 0, S2 = 4.8, S3 = 9.6, S4 = 16.8, S5 = 28.8, S6 = 33.6, END = 38.4;
+const FEATURE = 3.0;                                // seconds per feature in S4
+const PINK = '#FF6FA8';
+const COLORS = ['#A78BFA', '#5CC8FF', PINK, '#5EE6A8', '#FFC857'];   // our own palette, pink in the middle
+const APPS = [['Instagram', 'Reels'], ['YouTube', 'Shorts'], ['Facebook', 'Reels'], ['Snapchat', 'Spotlight'], ['X', 'Videos']];
+const FEATURES = [
+  ['A live counter', 'A small pill sits on top of your feed. One reel, one count.'],
+  ['Today at a glance', 'Reels scrolled, total time and average time per reel.'],
+  ['Trends over time', 'Your last 7 days, 30 days, and every month.'],
+  ['Home screen widget', 'Today&#39;s count, live, on your home screen.'],
+];
+const BRAIN = 'M12,4.6 C10.6,3 8.1,3 6.8,4.6 C5.1,4.7 4,6.2 4.3,7.7 C3,8.6 2.8,10.5 3.7,11.6 C3,12.8 3.4,14.4 4.6,15.1 ' +
+  'C4.6,16.9 6.2,18.2 7.9,17.9 C8.8,19.1 10.6,19.4 12,18.4 Z M7,8.6 C8.5,8.6 9.1,9.6 9.1,10.6 M6.2,13.2 C7.6,13.2 8.6,13.7 9,14.6';
+const brain = (size, w = 1.6) => {
+  const p = `<path d="${BRAIN}" fill="none" stroke="${PINK}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24">${p}<g transform="translate(24,0) scale(-1,1)">${p}</g></svg>`;
+};
+
+// ---- maths
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const prog = (t, start, dur) => clamp((t - start) / dur);
+const lerp = (a, b, x) => a + (b - a) * x;
+const out = x => 1 - Math.pow(1 - x, 3);
+const inOut = x => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const back = x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+const bounce = x => {
+  const n = 7.5625, d = 2.75;
+  if (x < 1 / d) return n * x * x;
+  if (x < 2 / d) return n * (x -= 1.5 / d) * x + 0.75;
+  if (x < 2.5 / d) return n * (x -= 2.25 / d) * x + 0.9375;
+  return n * (x -= 2.625 / d) * x + 0.984375;
+};
+const mix = (a, b, x) => {                          // '#rrggbb' colours
+  const h = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  const [p, q] = [h(a), h(b)];
+  return `rgb(${p.map((v, i) => Math.round(lerp(v, q[i], x))).join(',')})`;
+};
+/** Fades in over [inDur] from [start], fades out over [outDur] ending at [end]. */
+const window_ = (t, start, end, inDur = 0.4, outDur = 0.4) => out(prog(t, start, inDur)) * (1 - prog(t, end - outDur, outDur));
+
+// ---- elements
+const stage = document.getElementById('stage');
+const el = (html, cls = '', id = '') => {
+  const d = document.createElement('div');
+  d.className = cls; if (id) d.id = id; d.innerHTML = html;
+  stage.appendChild(d);
+  return d;
+};
+/** Centre [e] on (x, y). */
+const at = (e, x, y, o = 1, s = 1) => {
+  e.style.opacity = o;
+  e.style.transform = `translate(${x}px,${y}px) translate(-50%,-50%) scale(${s})`;
+};
+/** Top-left of [e] at (x, y). */
+const tl = (e, x, y, o = 1) => { e.style.opacity = o; e.style.transform = `translate(${x}px,${y}px)`; };
+const text = (html, size, weight = 500, cls = 'c') => {
+  const e = el(html, cls); e.style.fontSize = size + 'px'; e.style.fontWeight = weight; return e;
+};
+
+const dots = COLORS.map(c => { const d = el('', 'dot'); d.style.background = c; return d; });
+const hook = text('How many reels did you scroll today?', 76);
+const pill = el(`${brain(88, 1.7)}<span id="pn">0</span>`, '', 'pill');
+const pn = pill.querySelector('#pn'), pbrain = pill.querySelector('svg');
+const counts = text('ScrollTax counts every reel and short you scroll.', 60);
+const worksWith = text('WORKS WITH', 34, 500, 'c muted'); worksWith.style.letterSpacing = '8px';
+const apps = APPS.map(([n, s]) => el(`<div class="n">${n}</div><div class="s">${s}</div>`, 'app'));
+const oneCounter = text('One counter for all of them.', 52);
+const disclaimer = text('Not affiliated with or endorsed by Instagram, Meta, YouTube, Google, Snapchat or X.', 22, 400, 'c muted');
+const pdots = FEATURES.map(() => el('', 'pdot'));
+const ftitles = FEATURES.map(([t]) => el(t, 'ftitle'));
+const fdescs = FEATURES.map(([, d]) => el(d, 'fdesc'));
+const phone = el('', '', 'phone');
+const screens = [0, 1, 2, 3].map(() => { const d = document.createElement('div'); phone.appendChild(d); return d; });
+// Screen 0: an abstract feed (plain colour cards, so no one else's video is shown) with the counter pill on top.
+const cards = COLORS.map(c => {
+  const d = document.createElement('div'); d.className = 'card';
+  d.style.background = `linear-gradient(165deg, ${mix(c, '#0F0F13', 0.35)}, ${mix(c, '#0F0F13', 0.72)})`;
+  d.innerHTML = '<i style="left:26px;top:700px;width:64px;height:64px"></i><i style="left:104px;top:712px;width:170px;height:16px"></i>' +
+    '<i style="left:104px;top:740px;width:110px;height:14px"></i><i style="left:26px;top:790px;width:270px;height:14px"></i>' +
+    '<i style="left:346px;top:520px;width:44px;height:44px"></i><i style="left:346px;top:590px;width:44px;height:44px"></i>' +
+    '<i style="left:346px;top:660px;width:44px;height:44px"></i>';
+  screens[0].appendChild(d); return d;
+});
+const fpill = document.createElement('div'); fpill.id = 'fpill'; fpill.innerHTML = `${brain(30, 1.8)}<span>143</span>`;
+screens[0].appendChild(fpill);
+screens[1].innerHTML = '<img class="shot" src="../../screenshots/raw/demo-01-dashboard.png">';
+screens[2].innerHTML = '<img class="shot" src="../../screenshots/raw/demo-04-monthly.png">';
+screens[3].style.background = 'linear-gradient(170deg, #3A2A4A 0%, #5A3050 55%, #2A2238 100%)';
+screens[3].innerHTML = `<div class="widget">${brain(62, 1.7)}<div><div class="wn">143</div><div class="wl">reels today</div></div><div class="wt">31m</div></div>` +
+  [0, 1, 2, 3].map(i => `<i style="position:absolute;left:${38 + i * 92}px;top:740px;width:62px;height:62px;border-radius:50%;background:rgba(20,20,24,.55)"></i>`).join('');
+const wsmall = screens[3].querySelector('.widget');
+const wbig = el(`${brain(122, 1.7)}<div><div class="wn">143</div><div class="wl">reels today</div></div><div class="wt">31m</div>`, '', 'wbig');
+const wbigCount = wbig.querySelector('.wn');
+const privateTitle = text('<b>Private</b> by design', 92, 600); privateTitle.style.letterSpacing = '-1.5px';
+const chips = ['No account', 'No internet', 'No ads'].map(s => el(`<span></span>${s}`, 'chip'));
+const staysOnPhone = text('Everything stays on your phone.', 48, 500, 'c muted');
+const logo = el(brain(230, 1.5));
+const wordmark = text('ScrollTax', 150, 600); wordmark.style.letterSpacing = '-3px';
+const tagline = text('See what scrolling <b>really costs</b>', 50);
+const fade = el('', '', 'fade');
+
+// ---- timeline
+function renderAt(t) {
+  const hide = e => { e.style.opacity = 0; };
+  [hook, pill, counts, worksWith, oneCounter, disclaimer, phone, wbig, privateTitle, staysOnPhone, logo, wordmark, tagline,
+    ...dots, ...apps, ...pdots, ...ftitles, ...fdescs, ...chips].forEach(hide);
+  fade.style.opacity = Math.max(1 - prog(t, 0, 0.25), prog(t, END - 0.6, 0.55));
+
+  if (t < S2) {                                                       // 1. the question
+    const split = back(prog(t, 0.9, 0.6));
+    dots.forEach((d, i) => {
+      const hop = k => Math.sin(Math.PI * prog(t, k + i * 0.12, 0.45));
+      const y = lerp(-80, 470, bounce(prog(t, 0, 0.9))) - 70 * (hop(1.8) + hop(3.0));
+      at(d, 960 + (i - 2) * 130 * split, y, i === 2 || t >= 0.9 ? 1 : 0);
+    });
+    at(hook, 960, lerp(680, 650, out(prog(t, 1.2, 0.6))), window_(t, 1.2, 4.7, 0.6, 0.45));
+  } else if (t < S3) {                                                // 2. the answer: dots become the counter
+    const merge = inOut(prog(t, S2, 0.5));
+    const morph = out(prog(t, S2 + 0.6, 0.6));
+    dots.forEach((d, i) => {
+      const o = i === 2 ? (t < S2 + 0.6 ? 1 : 0) : 1 - prog(t, S2 + 0.3, 0.2);
+      at(d, 960 + (i - 2) * 130 * (1 - merge), 470, o, i === 2 ? 1 + 0.25 * Math.sin(Math.PI * prog(t, S2 + 0.4, 0.2)) : 1);
+    });
+    if (t >= S2 + 0.6) {
+      const leave = prog(t, S3 - 0.6, 0.5);
+      pill.style.width = lerp(72, 480, morph) + 'px';
+      pill.style.height = lerp(72, 156, morph) + 'px';
+      pill.style.background = mix(PINK, '#1A1A20', morph);
+      pill.style.border = `2px solid ${mix(PINK, '#34343E', morph)}`;
+      pill.style.boxShadow = `0 20px 110px rgba(255,111,168,${0.38 * morph})`;
+      pn.textContent = Math.round(143 * out(prog(t, S2 + 1.2, 1.8)));
+      pn.style.opacity = pbrain.style.opacity = prog(t, S2 + 0.9, 0.3);
+      at(pill, 960, 470, 1 - leave, 1 + 0.07 * Math.sin(Math.PI * prog(t, S2 + 2.9, 0.35)) - 0.1 * leave);
+    }
+    at(counts, 960, lerp(700, 670, out(prog(t, S2 + 1.5, 0.6))), window_(t, S2 + 1.5, S3 - 0.1, 0.6, 0.5));
+  } else if (t < S4) {                                                // 3. supported apps, one dot each
+    const leave = inOut(prog(t, S4 - 0.6, 0.5));
+    at(worksWith, 960, 270 - 30 * leave, out(prog(t, S3, 0.5)) * (1 - leave));
+    dots.forEach((d, i) => {
+      const start = S3 + BEAT * (i + 1);
+      const x = 960 + (i - 2) * 330;
+      at(d, x, 450 - 30 * leave, t >= start ? 1 - leave : 0, back(prog(t, start, 0.45)));
+      const o = out(prog(t, start + 0.1, 0.4));
+      at(apps[i], x, lerp(600, 580, o) - 30 * leave, o * (1 - leave));
+    });
+    const o = out(prog(t, S3 + BEAT * 6, 0.6));
+    at(oneCounter, 960, lerp(820, 800, o) - 30 * leave, o * (1 - leave));
+    at(disclaimer, 960, 1020, 0.75 * o * (1 - leave));
+  } else if (t < S5) {                                                // 4. features, with the app on a phone
+    const enter = out(prog(t, S4, 0.6)), leave = inOut(prog(t, S5 - 0.5, 0.45));
+    // Widget feature: one beat after the home screen arrives, the widget lifts out of the phone, grows, and
+    // counts two more reels on the next two beats. (1400, 428) is where the small widget sits on the stage.
+    const lift = S4 + FEATURE * 3 + BEAT, lifted = inOut(prog(t, lift, 0.6));
+    const ticks = [lift + BEAT, lift + 2 * BEAT];
+    at(phone, 1400 + 60 * lifted, 540 + 120 * (1 - enter) + 80 * leave, enter * (1 - leave) * lerp(1, 0.3, lifted));
+    wsmall.style.opacity = t >= lift ? 0 : 1;
+    wbigCount.textContent = 143 + ticks.filter(x => t >= x).length;
+    wbigCount.style.transform = `scale(${1 + 0.1 * ticks.reduce((a, x) => a + Math.sin(Math.PI * prog(t, x, 0.25)), 0)})`;
+    wbigCount.style.transformOrigin = 'left center';
+    at(wbig, lerp(1400, 1440, lifted), lerp(428, 540, lifted) + 80 * leave, t >= lift ? 1 - leave : 0, lerp(354 / 700, 1, lifted));
+    screens.forEach((s, i) => { s.style.transform = `translateY(${i === 0 ? 0 : 874 * (1 - out(prog(t, S4 + FEATURE * i, 0.55)))}px)`; });
+    // Feed: a new card slides up on every beat and the pill adds one.
+    const swipes = Math.floor((t - S4) / BEAT), local = (t - S4) % BEAT;
+    const slide = swipes === 0 ? 1 : inOut(prog(local, 0, 0.35));
+    cards.forEach((c, i) => {
+      const current = i === swipes % 5, previous = i === (swipes + 4) % 5;
+      c.style.zIndex = current ? 2 : 1;
+      c.style.opacity = current || previous ? 1 : 0;
+      c.style.transform = `translateY(${current ? 874 * (1 - slide) : previous ? -874 * slide : 0}px)`;
+    });
+    const counted = swipes === 0 ? 0 : swipes - (local < 0.25 ? 1 : 0);
+    fpill.lastChild.textContent = 143 + counted;
+    fpill.style.zIndex = 3;
+    fpill.style.transform = `translateX(-50%) scale(${1 + (swipes ? 0.14 * Math.sin(Math.PI * prog(local, 0.25, 0.25)) : 0)})`;
+    FEATURES.forEach((_, i) => {
+      const start = S4 + FEATURE * i, end = i === 3 ? S5 - 0.1 : start + FEATURE;
+      const o = window_(t, start + 0.1, end, 0.45, 0.3);
+      const y = 30 * (1 - out(prog(t, start + 0.1, 0.45))) - 20 * prog(t, end - 0.3, 0.3);
+      tl(ftitles[i], 170, 420 + y, o);
+      tl(fdescs[i], 174, 552 + y, o);
+    });
+    // Progress dots: the current feature's dot stretches into a pink bar.
+    let x = 176;
+    FEATURES.forEach((_, i) => {
+      const start = S4 + FEATURE * i;
+      const on = out(prog(t, start, 0.4)) * (i === 3 ? 1 : 1 - out(prog(t, start + FEATURE, 0.4)));
+      pdots[i].style.width = lerp(14, 52, on) + 'px';
+      pdots[i].style.background = mix('#3A3A44', PINK, on);
+      tl(pdots[i], x, 350, enter * (1 - leave));
+      x += lerp(14, 52, on) + 12;
+    });
+  } else if (t < S6) {                                                // 5. why trust it
+    const leave = inOut(prog(t, S6 - 0.5, 0.45));
+    const o = out(prog(t, S5 + 0.1, 0.5));
+    at(privateTitle, 960, lerp(350, 330, o) - 30 * leave, o * (1 - leave));
+    chips.forEach((c, i) => {
+      const start = S5 + BEAT * (i + 1);
+      at(c, chipX[i], 540 - 30 * leave, t >= start ? 1 - leave : 0, back(prog(t, start, 0.45)));
+    });
+    const s = out(prog(t, S5 + BEAT * 4, 0.6));
+    at(staysOnPhone, 960, lerp(730, 710, s) - 30 * leave, s * (1 - leave));
+  } else {                                                            // 6. dots become the logo
+    const merge = inOut(prog(t, S6 + BEAT, 0.5));
+    const pop = S6 + BEAT * 2;
+    dots.forEach((d, i) => {
+      const o = i === 2 ? 1 - prog(t, pop, 0.3) : (t >= S6 + i * 0.06 ? 1 : 0) * (1 - prog(t, S6 + BEAT + 0.3, 0.2));
+      at(d, 960 + (i - 2) * 130 * (1 - merge), 400, o, i === 2 ? back(prog(t, S6, 0.4)) * (1 + 1.6 * out(prog(t, pop, 0.3))) : back(prog(t, S6 + i * 0.06, 0.4)));
+    });
+    at(logo, 960, 380, prog(t, pop, 0.2), lerp(0.5, 1, back(prog(t, pop, 0.55))));
+    const w = out(prog(t, pop + 0.3, 0.6)), g = out(prog(t, pop + 0.9, 0.6));
+    at(wordmark, 960, lerp(650, 620, w), w);
+    at(tagline, 960, lerp(790, 770, g), g);
+  }
+}
+
+let chipX = [490, 960, 1430];
+/** Lays the chips out with equal gaps once the font has loaded and their widths are known. */
+function layoutChips() {
+  const gap = 48, widths = chips.map(c => c.offsetWidth);
+  let x = 960 - (widths.reduce((a, b) => a + b, 0) + gap * (chips.length - 1)) / 2;
+  chipX = widths.map(w => { const centre = x + w / 2; x += w + gap; return centre; });
+}
+
+window.DURATION = END;
+window.renderAt = renderAt;
+window.ready = Promise.all([document.fonts.ready, ...[...document.images].map(i => i.decode().catch(() => {}))]).then(() => { layoutChips(); renderAt(0); return true; });
+
+// Real-time preview when opened by hand; render.mjs adds ?capture to drive time itself.
+if (!location.search.includes('capture')) {
+  window.ready.then(() => {
+    const t0 = performance.now();
+    const frame = () => { renderAt(((performance.now() - t0) / 1000) % (END + 1)); requestAnimationFrame(frame); };
+    frame();
+  });
+}
+</script>
+</body>
+</html>
